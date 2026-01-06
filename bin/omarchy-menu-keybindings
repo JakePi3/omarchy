@@ -85,14 +85,8 @@ parse_keycodes() {
 # - Map numeric modifier key mask to a textual rendition
 # - Output comma-separated values that the parser can understand
 dynamic_bindings() {
-  local submap_filter="$1"
   hyprctl -j binds |
-    jq -r --arg submap "$submap_filter" '
-      .[] |
-      select((.submap) == $submap) |
-      {modmask, key, keycode, description, dispatcher, arg} |
-      "\(.modmask),\(.key)@\(.keycode),\(.description),\(.dispatcher),\(.arg)"
-    ' |
+    jq -r '.[] | {modmask, key, keycode, description, dispatcher, arg} | "\(.modmask),\(.key)@\(.keycode),\(.description),\(.dispatcher),\(.arg)"' |
     sed -r \
       -e 's/null//' \
       -e 's,~/.local/share/omarchy/bin/,,' \
@@ -220,21 +214,16 @@ prioritize_entries() {
 
 monitor_height=$(hyprctl monitors -j | jq -r '.[] | select(.focused == true) | .height')
 menu_height=$((monitor_height * 40 / 100))
-activemap=$(hyprctl submap)
-
-if [[ "$activemap" == "default" ]]; then
-  activemap=""
-fi
 
 build_keymap_cache
 
 {
-  dynamic_bindings $activemap
+  dynamic_bindings
   static_bindings
 } |
   sort -u |
   parse_keycodes |
   parse_bindings |
   prioritize_entries |
-  walker --dmenu -p "Keybindings$( if [[ ! -z "$activemap" ]]; then echo " for $activemap"; fi )" --width 800 --height "$menu_height"
+  walker --dmenu -p 'Keybindings' --width 800 --height "$menu_height"
 
